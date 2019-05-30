@@ -1,3 +1,22 @@
+#include <netdb.h>
+#include "Server.hpp"
+#include "HttpParser.hpp"
+
+int nthOccurrence(const std::string& str, const std::string& findMe, int nth)
+{
+	size_t  pos = 0;
+	int     cnt = 0;
+
+	while( cnt != nth )
+	{
+		pos+=1;
+		pos = str.find(findMe, pos);
+		if ( pos == std::string::npos )
+			return -1;
+		cnt++;
+	}
+	return pos;
+}
 
 void Server::configureServer(int port) 
 {
@@ -18,7 +37,7 @@ void Server::setServerSocket()
     int one = 1;
 	int operationStatus = setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
 	exitOnError(operationStatus, "Unable to set socket options");
-    int operationStatus = bind(m_serverSocket, (sockaddr*)&m_serverAddr, sizeof(m_serverAddr));
+    operationStatus = bind(m_serverSocket, (sockaddr*)&m_serverAddr, sizeof(m_serverAddr));
 	exitOnError(operationStatus, "Unable to bind");
 
 }
@@ -41,9 +60,10 @@ void Server::exitOnError(int operationStatus, const std::string& errorMessage)
 void Server::setServerPollFD()
 {
 	m_pollfds.push_back({m_serverSocket, POLLIN, 0});
+	m_clients.push_back(Client());
 }
 
-void Server::listen() 
+void Server::listenConnections()
 {
 	int operationStatus = listen(m_serverSocket, 1);
 	exitOnError(operationStatus, "Unable to listen");
@@ -59,7 +79,7 @@ void Server::handleConnections()
         if (operationStatus == 0)
             continue;
 
-		for (unsigned i = 0; i < m_pollfds.size(); ++i) {
+		for (unsigned i = 0; i < m_pollfds.size(); i++) {
 
 			if ((m_pollfds.at(i).fd == m_serverSocket) && (m_pollfds.at(i).revents & POLLIN)) 
 			{
@@ -69,18 +89,53 @@ void Server::handleConnections()
 
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLIN)) 
 			{
-				char buffer[1000000];
-                int receive_status = recv(polls[i].fd, (void*) buffer, sizeof(buffer), 0);
-                m_clients[i].httpRequest.append(buffer);
 
-				if(shouldBreak) {
-					break;
+				std::cout << m_pollfds.size() << "SIZE POLL" << std::endl;
+				std::cout << m_clients.size() << "SIZE CLIENT" << std::endl;
+
+				char buffer[1000000];
+                int receive_status = recv(m_pollfds[i].fd, (void*) buffer, sizeof(buffer), 0);
+                std::string str(buffer);
+
+				std::string method = HttpParser::getHttpMethod(str);
+				std::string targetServer = HttpParser::getTargetServer(str);
+				if(method == "CONNECT"){
+					m_clients[i].targetServer = targetServer;
+					std::string responseOK("HTTP/1.1 200 OK");
+					send(m_pollfds[i].fd, responseOK.c_str(), responseOK.size(), 0);
+				} else if(method == "GET") {
+					if(targetServer[0] != '/'){
+						int n = nthOccurrence(targetServer, "/", 3);
+						std::string subst = targetServer.substr(n);
+						std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << subst << std::endl;
+						std::string youtube("youtube.pl");
+
+						addrinfo ahints;
+						addrinfo *paRes, *rp;
+
+						ahints.ai_family = AF_UNSPEC;
+						ahints.ai_socktype = SOCK_STREAM;
+						if (getaddrinfo(youtube.c_str(), "80", &ahints, &paRes) != 0)
+							std::cout << "BLAD" << std::endl;
+
+
+						for (rp = paRes; rp != NULL; rp = rp->ai_next) {
+							std::cout<< "PARES" << rp->ai_addr->sa_data << std::endl;
+						}
+
+
+					}
 				}
+
+				m_clients[i].httpRequest.append(buffer);
+                std::cout<< buffer <<std::endl;
+
+				;
 			}
 
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLOUT))
 			{
-				writeData(i);
+				;
 			}
 		}
 	}
@@ -96,10 +151,10 @@ void Server::acceptNewConnection()
     
 	setSocketToNonBlocking(clientSocket);
 
-	Client newClient;
-	newClient.clientAddr = addr;
+	Client *newClient = new Client();
+	newClient->clientAddr = addr;
 
-	m_clients.push_back(newClient);
+	m_clients.push_back(*newClient);
 	m_pollfds.push_back({clientSocket, POLLIN | POLLOUT, 0});
 
 	std::cout << " + New connection accepted + " << std::endl;
