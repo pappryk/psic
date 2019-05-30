@@ -13,6 +13,7 @@ public:
 	std::string httpRequest = "";
 	std::string targetServer;
 	std::vector<char> httpResponse;
+
 	unsigned offset = 0;
 };
 

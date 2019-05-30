@@ -95,27 +95,30 @@ void Server::handleConnections()
 
 				char buffer[1000000];
                 int receive_status = recv(m_pollfds[i].fd, (void*) buffer, sizeof(buffer), 0);
-                std::string str(buffer);
+                std::string request(buffer);
 
-				std::string method = HttpParser::getHttpMethod(str);
-				std::string targetServer = HttpParser::getTargetServer(str);
+				std::string method = HttpParser::getHttpMethod(request);
+				std::string targetServer = HttpParser::getTargetServer(request);
+				m_clients[i].httpRequest = request;
 				if(method == "CONNECT"){
 					m_clients[i].targetServer = targetServer;
 					std::string responseOK("HTTP/1.1 200 OK");
 					send(m_pollfds[i].fd, responseOK.c_str(), responseOK.size(), 0);
 				} else if(method == "GET") {
 					if(targetServer[0] != '/'){
-						int n = nthOccurrence(targetServer, "/", 3);
-						std::string subst = targetServer.substr(n);
-						std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << subst << std::endl;
-						std::string youtube("youtube.pl");
+						int slashBeforeResourcePosition = nthOccurrence(targetServer, "/", 3);
+                        int slashBeforeServerPosition = nthOccurrence(targetServer, "/", 2);
+
+						std::string resource = targetServer.substr(slashBeforeResourcePosition);
+                        std::string serverName = targetServer.substr(slashBeforeServerPosition + 1, slashBeforeResourcePosition - slashBeforeServerPosition - 1);
+                        std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << resource <<" EEEE " << serverName << std::endl;
 
 						addrinfo ahints;
 						addrinfo *paRes, *rp;
 
 						ahints.ai_family = AF_UNSPEC;
 						ahints.ai_socktype = SOCK_STREAM;
-						if (getaddrinfo(youtube.c_str(), "80", &ahints, &paRes) != 0)
+						if (getaddrinfo(serverName.c_str(), "80", &ahints, &paRes) != 0)
 							std::cout << "BLAD" << std::endl;
 
 
@@ -123,14 +126,57 @@ void Server::handleConnections()
 							std::cout<< "PARES" << rp->ai_addr->sa_data << std::endl;
 						}
 
+						int iSockfd;
+                        if ((iSockfd = socket(paRes->ai_family, paRes->ai_socktype, paRes->ai_protocol)) < 0) {
+                            fprintf (stderr," Error in creating socket to server ! \n");
+                            exit (1);
+                        } else {
+                            std::cout << "OKOKOKO" <<std::endl;
+                        }
+                        if (connect(iSockfd, paRes->ai_addr, paRes->ai_addrlen) < 0) {
+                            fprintf (stderr," Error in connecting to server ! \n");
+                            exit (1);
+                        } else {
+                            std::cout << "OKOKOKO" <<std::endl;
+                        }
+
+                        m_clients[i].httpRequest.replace(m_clients[i].httpRequest.find(targetServer), sizeof(targetServer) - 1, resource);
+
+                        std::cout << "REPLACED: " << m_clients[i].httpRequest << "  <-------" << std::endl;
+
+                        int response_size = m_clients[i].httpRequest.length();
+                        int temp_response_size = response_size;
+
+                        char * temp_buffer_to_send = (char*) m_clients[i].httpRequest.c_str();
+
+                        while (temp_response_size > 0)
+                        {
+                            ssize_t server_send = send(iSockfd, temp_buffer_to_send, temp_response_size, 0);
+                            if(server_send <= 0 )
+                            {
+                                perror("send() failure");
+                                exit(EXIT_FAILURE);
+                            }
+                            temp_buffer_to_send += server_send;
+                            temp_response_size -= server_send;
+                        }
+
+                        char response[100000];
+                        int recvfd = recv(iSockfd, response, sizeof(response), 0);
+                        if (recvfd == -1)
+                        {
+                            perror("Recvfd error");
+                            exit(1);
+                        }
+
+                        std::cout << "RESPONSE:   " << response << std::endl;
+
+                        send(m_pollfds[i].fd, response, sizeof(response), 0);
 
 					}
 				}
 
-				m_clients[i].httpRequest.append(buffer);
-                std::cout<< buffer <<std::endl;
 
-				;
 			}
 
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLOUT))
