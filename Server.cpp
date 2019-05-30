@@ -111,7 +111,7 @@ void Server::handleConnections()
 
 						std::string resource = targetServer.substr(slashBeforeResourcePosition);
                         std::string serverName = targetServer.substr(slashBeforeServerPosition + 1, slashBeforeResourcePosition - slashBeforeServerPosition - 1);
-                        std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << resource <<" EEEE " << serverName << std::endl;
+                        //std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << resource <<" EEEE " << serverName << std::endl;
 
 						addrinfo ahints;
 						addrinfo *paRes, *rp;
@@ -122,28 +122,28 @@ void Server::handleConnections()
 							std::cout << "BLAD" << std::endl;
 
 
-						for (rp = paRes; rp != NULL; rp = rp->ai_next) {
-							std::cout<< "PARES" << rp->ai_addr->sa_data << std::endl;
-						}
+//						for (rp = paRes; rp != NULL; rp = rp->ai_next) {
+//							std::cout<< "PARES" << rp->ai_addr->sa_data << std::endl;
+//						}
 
 						int iSockfd;
                         if ((iSockfd = socket(paRes->ai_family, paRes->ai_socktype, paRes->ai_protocol)) < 0) {
                             fprintf (stderr," Error in creating socket to server ! \n");
                             exit (1);
                         } else {
-                            std::cout << "OKOKOKO" <<std::endl;
+                           ;// std::cout << "OKOKOKO" <<std::endl;
                         }
                         if (connect(iSockfd, paRes->ai_addr, paRes->ai_addrlen) < 0) {
                             fprintf (stderr," Error in connecting to server ! \n");
                             exit (1);
                         } else {
-                            std::cout << "OKOKOKO" <<std::endl;
+                           ;// std::cout << "OKOKOKO" <<std::endl;
                         }
 
-                        std::cout << "HTTPREQ: " << m_clients[i].httpRequest << std::endl;
+                        //std::cout << "HTTPREQ: " << m_clients[i].httpRequest << std::endl;
                         m_clients[i].httpRequest.replace(m_clients[i].httpRequest.find(targetServer), slashBeforeResourcePosition, std::string(""));
 
-                        std::cout << "REPLACED: " << m_clients[i].httpRequest << "  <-------" << std::endl;
+                        std::cout << "REPLACED: " << m_clients[i].httpRequest << std::endl;
 
                         int response_size = m_clients[i].httpRequest.length();
                         int temp_response_size = response_size;
@@ -162,7 +162,8 @@ void Server::handleConnections()
                             temp_response_size -= server_send;
                         }
 
-                        char response[100000];
+                        char response[1000000];
+                        memset(response, 0, sizeof(response));
                         int recvfd = recv(iSockfd, response, sizeof(response), 0);
                         if (recvfd == -1)
                         {
@@ -172,7 +173,7 @@ void Server::handleConnections()
 
                         std::cout << "RESPONSE:   " << response << std::endl;
 
-                        send(m_pollfds[i].fd, response, sizeof(response), 0);
+                        send(m_pollfds[i].fd, response, recvfd, 0);
 
 					}
 				}
