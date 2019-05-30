@@ -90,8 +90,8 @@ void Server::handleConnections()
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLIN)) 
 			{
 
-				std::cout << m_pollfds.size() << "SIZE POLL" << std::endl;
-				std::cout << m_clients.size() << "SIZE CLIENT" << std::endl;
+//				std::cout << m_pollfds.size() << "SIZE POLL" << std::endl;
+//				std::cout << m_clients.size() << "SIZE CLIENT" << std::endl;
 
 				char buffer[1000000];
                 int receive_status = recv(m_pollfds[i].fd, (void*) buffer, sizeof(buffer), 0);
@@ -140,7 +140,8 @@ void Server::handleConnections()
                             std::cout << "OKOKOKO" <<std::endl;
                         }
 
-                        m_clients[i].httpRequest.replace(m_clients[i].httpRequest.find(targetServer), sizeof(targetServer) - 1, resource);
+                        std::cout << "HTTPREQ: " << m_clients[i].httpRequest << std::endl;
+                        m_clients[i].httpRequest.replace(m_clients[i].httpRequest.find(targetServer), slashBeforeResourcePosition, std::string(""));
 
                         std::cout << "REPLACED: " << m_clients[i].httpRequest << "  <-------" << std::endl;
 
