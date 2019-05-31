@@ -90,9 +90,6 @@ void Server::handleConnections()
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLIN)) 
 			{
 
-//				std::cout << m_pollfds.size() << "SIZE POLL" << std::endl;
-//				std::cout << m_clients.size() << "SIZE CLIENT" << std::endl;
-
 				char buffer[1000000];
                 int receive_status = recv(m_pollfds[i].fd, (void*) buffer, sizeof(buffer), 0);
                 std::string request(buffer);
@@ -100,6 +97,7 @@ void Server::handleConnections()
 				std::string method = HttpParser::getHttpMethod(request);
 				std::string targetServer = HttpParser::getTargetServer(request);
 				m_clients[i].httpRequest = request;
+
 				if(method == "CONNECT"){
 					m_clients[i].targetServer = targetServer;
 					std::string responseOK("HTTP/1.1 200 OK");
@@ -111,10 +109,9 @@ void Server::handleConnections()
 
 						std::string resource = targetServer.substr(slashBeforeResourcePosition);
                         std::string serverName = targetServer.substr(slashBeforeServerPosition + 1, slashBeforeResourcePosition - slashBeforeServerPosition - 1);
-                        //std::cout<< "EEEEEEEEEEEEEEEEEEEEEEEE           " << resource <<" EEEE " << serverName << std::endl;
 
 						addrinfo ahints;
-						addrinfo *paRes, *rp;
+						addrinfo *paRes;
 
 						ahints.ai_family = AF_UNSPEC;
 						ahints.ai_socktype = SOCK_STREAM;
@@ -122,25 +119,21 @@ void Server::handleConnections()
 							std::cout << "BLAD" << std::endl;
 
 
-//						for (rp = paRes; rp != NULL; rp = rp->ai_next) {
-//							std::cout<< "PARES" << rp->ai_addr->sa_data << std::endl;
-//						}
-
 						int iSockfd;
                         if ((iSockfd = socket(paRes->ai_family, paRes->ai_socktype, paRes->ai_protocol)) < 0) {
                             fprintf (stderr," Error in creating socket to server ! \n");
                             exit (1);
                         } else {
-                           ;// std::cout << "OKOKOKO" <<std::endl;
+                           ;
                         }
+
                         if (connect(iSockfd, paRes->ai_addr, paRes->ai_addrlen) < 0) {
                             fprintf (stderr," Error in connecting to server ! \n");
                             exit (1);
                         } else {
-                           ;// std::cout << "OKOKOKO" <<std::endl;
+                           ;
                         }
 
-                        //std::cout << "HTTPREQ: " << m_clients[i].httpRequest << std::endl;
                         m_clients[i].httpRequest.replace(m_clients[i].httpRequest.find(targetServer), slashBeforeResourcePosition, std::string(""));
 
                         std::cout << "REPLACED: " << m_clients[i].httpRequest << std::endl;
@@ -152,6 +145,7 @@ void Server::handleConnections()
 
                         while (temp_response_size > 0)
                         {
+                            std::cout << "xxx" << std::endl;
                             ssize_t server_send = send(iSockfd, temp_buffer_to_send, temp_response_size, 0);
                             if(server_send <= 0 )
                             {
@@ -163,18 +157,25 @@ void Server::handleConnections()
                         }
 
                         char response[1000000];
-                        memset(response, 0, sizeof(response));
-                        int recvfd = recv(iSockfd, response, sizeof(response), 0);
-                        if (recvfd == -1)
+                        while (1)
                         {
-                            perror("Recvfd error");
-                            exit(1);
+                            std::cout << "ddd" << std::endl;
+                            memset(response, 0, sizeof(response));
+                            int recvfd = recv(iSockfd, response, sizeof(response), 0);
+                            if (recvfd == -1)
+                            {
+                                perror("Recvfd error");
+                                exit(1);
+                            }
+
+                            std::cout << "RESPONSE:   " << response << std::endl;
+
+                            send(m_pollfds[i].fd, response, recvfd, 0);
+                            if (recvfd == 0)
+                                break;
                         }
 
-                        std::cout << "RESPONSE:   " << response << std::endl;
-
-                        send(m_pollfds[i].fd, response, recvfd, 0);
-
+                        close(m_pollfds[i].fd);
 					}
 				}
 
