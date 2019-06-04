@@ -2,6 +2,22 @@
 #include "Server.hpp"
 #include "HttpParser.hpp"
 
+std::vector <std::string> split(std::string str, std::string token) {
+    std::vector <std::string> result;
+    while (str.size()) {
+        int index = str.find(token);
+        if (index != std::string::npos) {
+            result.push_back(str.substr(0, index));
+            str = str.substr(index + token.size());
+            if (str.size() == 0)result.push_back(str);
+        } else {
+            result.push_back(str);
+            str = "";
+        }
+    }
+    return result;
+}
+
 int nthOccurrence(const std::string& str, const std::string& findMe, int nth)
 {
 	size_t  pos = 0;
@@ -156,25 +172,54 @@ void Server::handleConnections()
                             temp_response_size -= server_send;
                         }
 
+                        std::cout << "0000000" << std::endl;
                         char response[1000000];
-                        while (1)
+                        int z = 0;
+						memset(response, 0, sizeof(response));
+                        while (z < 3)
                         {
+                            z++;
+                            std::cout << "1111111111111" << std::endl;
+                            sleep(1);
                             std::cout << "ddd" << std::endl;
-                            memset(response, 0, sizeof(response));
-                            int recvfd = recv(iSockfd, response, sizeof(response), 0);
+                            int recvfd = recv(iSockfd, response + strlen(response), sizeof(response) - strlen(response), 0);
                             if (recvfd == -1)
                             {
                                 perror("Recvfd error");
                                 exit(1);
                             }
 
-                            std::cout << "RESPONSE:   " << response << std::endl;
+                            std::cout << "RESPONSEEEEEEEEEee:   " << z << response << std::endl;
 
-                            send(m_pollfds[i].fd, response, recvfd, 0);
-                            if (recvfd == 0)
+                            if (recvfd <= 0 )
                                 break;
                         }
 
+
+                        response_size = strlen(response);
+                        temp_response_size = response_size;
+
+
+                        std::cout << " CAŁY RESPONSE \n\n\n\n\n\n\n:"  << response << std::endl  << std::endl ;
+                        std::cout << " JEGO DLUGOSC: "<< response_size;
+
+                        while (temp_response_size > 0)
+                        {
+                            std::cout << "xxx" << std::endl;
+                            ssize_t server_send = send(m_pollfds[i].fd, response, temp_response_size, 0);
+                            if(server_send <= 0 )
+                            {
+                                perror("send() failure");
+                                exit(EXIT_FAILURE);
+                            }
+                            temp_buffer_to_send += server_send;
+                            temp_response_size -= server_send;
+						}
+
+
+
+
+                        m_clients[i].httpRequest = "";
                         close(m_pollfds[i].fd);
 					}
 				}
@@ -184,7 +229,7 @@ void Server::handleConnections()
 
 			if ((m_pollfds.at(i).fd != m_serverSocket) && (m_pollfds.at(i).revents & POLLOUT))
 			{
-				;
+				//std::cout << xddddddddddddddddddddddddddddddddddddddddddddddddddd" <<std::endl;
 			}
 		}
 	}
