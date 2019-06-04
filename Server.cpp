@@ -2,20 +2,32 @@
 #include "Server.hpp"
 #include "HttpParser.hpp"
 
-std::vector <std::string> split(std::string str, std::string token) {
-    std::vector <std::string> result;
-    while (str.size()) {
-        int index = str.find(token);
-        if (index != std::string::npos) {
-            result.push_back(str.substr(0, index));
-            str = str.substr(index + token.size());
-            if (str.size() == 0)result.push_back(str);
-        } else {
-            result.push_back(str);
-            str = "";
+int getContentLength(std::string response)
+{
+    std::size_t indexOfLineStartsWithContentLength = response.find("Content-Length:");
+
+    if (indexOfLineStartsWithContentLength != std::string::npos)
+    {
+
+        std::string lineStartsWithContentLength = response.substr(indexOfLineStartsWithContentLength);
+        std::istringstream ss(lineStartsWithContentLength);
+        std::string foundOneLineWithContentLength;
+        std::getline(ss, foundOneLineWithContentLength);
+
+        std::size_t ColonAfterContentLength = foundOneLineWithContentLength.find(':');
+        if(ColonAfterContentLength != std::string::npos)
+        {
+            std::string contentLengthString = foundOneLineWithContentLength.substr(ColonAfterContentLength + 2);
+            std::stringstream contentLengthStringStream(contentLengthString);
+            int contentLength = 0;
+            contentLengthStringStream >> contentLength;
+            return contentLength;
         }
+        else
+            return 0;
     }
-    return result;
+    return 0;
+
 }
 
 int nthOccurrence(const std::string& str, const std::string& findMe, int nth)
@@ -174,14 +186,16 @@ void Server::handleConnections()
 
                         std::cout << "0000000" << std::endl;
                         char response[1000000];
-                        int z = 0;
 						memset(response, 0, sizeof(response));
-                        while (z < 3)
+
+						int ctl = 1;
+
+                        int received = 0;
+                        while (received < ctl)
                         {
-                            z++;
-                            std::cout << "1111111111111" << std::endl;
+                            //std::cout << "1111111111111" << std::endl;
                             sleep(1);
-                            std::cout << "ddd" << std::endl;
+                            //std::cout << "ddd" << std::endl;
                             int recvfd = recv(iSockfd, response + strlen(response), sizeof(response) - strlen(response), 0);
                             if (recvfd == -1)
                             {
@@ -189,10 +203,15 @@ void Server::handleConnections()
                                 exit(1);
                             }
 
-                            std::cout << "RESPONSEEEEEEEEEee:   " << z << response << std::endl;
+                            if(ctl == 1){
+                                std::string strrsp (response);
+                                ctl = getContentLength(strrsp);
+                                std::cout << "ELO MORDY CL : " << ctl << std::endl;
+                            }
 
-                            if (recvfd <= 0 )
-                                break;
+                            //std::cout << "RESPONSEEEEEEEEEee:   "  << response << std::endl;
+
+                            received += recvfd;
                         }
 
 
