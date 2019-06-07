@@ -11,7 +11,7 @@ class Client
 public:
 
     bool connected = false;
-
+    bool closed = false;
     int already_sent_to_server = 0;
     int already_received_from_server = 0;
     int already_sent_to_browser;

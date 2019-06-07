@@ -216,6 +216,8 @@ void Server::handleConnections() {
 
             if ((m_pollfds[m_clients[i].proxyServer].fd != m_serverSocket) &&
                 (m_pollfds[m_clients[i].proxyServer].revents & POLLIN)) {
+                if(m_clients[i].closed)
+                    continue;
                 char response[10000];
                 memset(response, 0, sizeof(response));
 
@@ -223,8 +225,11 @@ void Server::handleConnections() {
                                                                      sizeof(response), 0);
                     //m_clients[i].httpResponse.append(std::string(response));
 
-                    if(m_clients[i].already_received_from_server == 0)
+                    if(m_clients[i].already_received_from_server == 0) {
                         close(m_pollfds[m_clients[i].browserProxy].fd);
+                        std::cout << "CLOSED CONNECTION: " << m_pollfds[m_clients[i].browserProxy].fd << std::endl;
+                        m_clients[i].closed = true;
+                    }
                     else
                     send(m_pollfds[m_clients[i].browserProxy].fd,
                                                                 (char *) response,
@@ -274,5 +279,5 @@ void Server::acceptNewConnection() {
 
     m_clients[m_clients.size() - 1].browserProxy = m_pollfds.size() - 2;
     m_clients[m_clients.size() - 1].proxyServer =  m_pollfds.size() - 1;
-    std::cout << " + New connection accepted + " << std::endl;
+    std::cout << " + New connection accepted + " << clientSocket << std::endl;
 }
