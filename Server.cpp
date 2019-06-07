@@ -143,19 +143,22 @@ void Server::handleConnections() {
             if ((m_pollfds[m_clients[i].browserProxy].fd != m_serverSocket) && (m_pollfds[m_clients[i].browserProxy].revents & POLLIN)) {
 
                 char buffer[10000];
+                memset(buffer, 0, 10000);
                 int receive_status = recv(m_pollfds[m_clients[i].browserProxy].fd, (void *) buffer, sizeof(buffer), 0);
 
                 if(receive_status > 0) {
                     m_clients[i].httpRequest = std::string(buffer);
                     std::cout << " DOSTAJE REQUEST: " << i << "  " << std::endl << m_clients[i].httpRequest
-                              << std::endl;
+                              << std::endl << "KONIEC" << std::endl;
 
                     std::string method = HttpParser::getHttpMethod(m_clients[i].httpRequest);
                     std::string targetServer = HttpParser::getTargetServer(m_clients[i].httpRequest);
 
 
-                    if (method == "GET") {
+                    if (method == "GET" && !m_clients[i].connected) {
                         if (targetServer[0] != '/') {
+                            m_clients[i].connected = true;
+
                             int slashBeforeResourcePosition = nthOccurrence(targetServer, "/", 3);
                             int slashBeforeServerPosition = nthOccurrence(targetServer, "/", 2);
 
@@ -192,9 +195,6 @@ void Server::handleConnections() {
 
                             pollfd new_poll = {iSockfd, POLLIN | POLLOUT, 0};
                             m_pollfds[m_clients[i].proxyServer] = new_poll;
-                            m_clients[i].isAllReceivedFromBrowser = true;
-                            m_clients[i].isAllSentToServer = false;
-
                         }
                     }
                 }
@@ -207,11 +207,11 @@ void Server::handleConnections() {
 
                 char *temp_buffer_to_send = (char *) m_clients[i].httpRequest.c_str();
 
-                if (m_clients[i].already_sent_to_server < request_size)
-                    send(m_pollfds[m_clients[i].proxyServer].fd, temp_buffer_to_send + m_clients[i].already_sent_to_server,
-                         temp_response_size - m_clients[i].already_sent_to_server, 0);
-                else m_clients[i].isAllSentToServer = true;
-
+                if(request_size > 0) {
+                    send(m_pollfds[m_clients[i].proxyServer].fd, temp_buffer_to_send,
+                         temp_response_size, 0);
+                    m_clients[i].httpRequest = std::string("");
+                }
             }
 
             if ((m_pollfds[m_clients[i].proxyServer].fd != m_serverSocket) &&
@@ -221,26 +221,33 @@ void Server::handleConnections() {
 
                     m_clients[i].already_received_from_server = recv(m_pollfds[m_clients[i].proxyServer].fd, response,
                                                                      sizeof(response), 0);
-                    m_clients[i].httpResponse.append(std::string(response));
+                    //m_clients[i].httpResponse.append(std::string(response));
 
-                    std::string response_from_server(response);
+                    if(m_clients[i].already_received_from_server == 0)
+                        close(m_pollfds[m_clients[i].browserProxy].fd);
+                    else
+                    send(m_pollfds[m_clients[i].browserProxy].fd,
+                                                                (char *) response,
+                     m_clients[i].already_received_from_server , 0);
 
-                    std::cout << "ODBIERAM OD SERWERA: " << i <<" \n " << response_from_server << std::endl;
+                    //std::string response_from_server(response);
+
+                   // std::cout << "ODBIERAM OD SERWERA: " << i <<" \n " << response_from_server << std::endl;
             }
 
 
             if ((m_pollfds[m_clients[i].browserProxy].fd != m_serverSocket) && (m_pollfds[m_clients[i].browserProxy].revents & POLLOUT)
                 ) {
 
-                if(m_clients[i].httpResponse.length() > 0){
-                    ssize_t sent =  send(m_pollfds[m_clients[i].browserProxy].fd,
-                                                                (char *) m_clients[i].httpResponse.c_str(),
-                                                                m_clients[i].httpResponse.length() , 0);
-                    std::cout << "WYSYLAM DO BROWSERA: " << i <<" \n " << m_clients[i].httpResponse.substr(0, sent) << std::endl;
-                    if(sent > 0)
-                        m_clients[i].httpResponse = m_clients[i].httpResponse.substr(sent, m_clients[i].httpResponse.size());
-                    std::cout << "ZOSTAJE DO WYSLANIA: " << i <<" \n " << m_clients[i].httpResponse << std::endl;
-                }
+//                if(m_clients[i].httpResponse.length() > 0){
+//                    ssize_t sent =  send(m_pollfds[m_clients[i].browserProxy].fd,
+//                                                                (char *) m_clients[i].httpResponse.c_str(),
+//                                                                m_clients[i].httpResponse.length() , 0);
+//                    std::cout << "WYSYLAM DO BROWSERA: " << i <<" \n " << m_clients[i].httpResponse.substr(0, sent) << std::endl;
+//                    if(sent > 0)
+//                        m_clients[i].httpResponse = m_clients[i].httpResponse.substr(0, sent);
+//                    std::cout << "ZOSTAJE DO WYSLANIA: " << i <<" \n " << m_clients[i].httpResponse << std::endl;
+//                }
             }
         }
     }
